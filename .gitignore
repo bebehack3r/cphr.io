@@ -1,0 +1,4 @@
+/node_modules/
+.env
+eth.js
+package-lock.json
