@@ -50,12 +50,13 @@ app.post('/', (req, res) => {
         params.outputEncoding
       );
       ciphered += cipher.final(params.outputEncoding);
+      ciphered = '' + randomBlock + '*' + ciphered;
       const privateKey = new Buffer(process.env.PRIVATE_KEY, 'hex');
       web3.eth.getTransactionCount(web3.eth.defaultAccount).then(nonce => {
         let txParams = {
           nonce: web3.utils.toHex('' + nonce++),
-          gasPrice: '0x028fa6ae00',
-          gasLimit: '0xa028',
+          gasPrice: web3.utils.toHex('1000000000'), // this price works: '0x028fa6ae00',
+          gasLimit: web3.utils.toHex('30000'), // this limit works: '0xa028',
           to: receiver,
           form: web3.eth.defaultAccount,
           value: '0x0',
@@ -78,18 +79,45 @@ app.post('/', (req, res) => {
   });
 });
 
+app.post('/enc', (req, res) => {
+  let { message } = req.body;
+  web3.eth.getBlock('latest', (error, result) => {
+    if (error) throw error;
+    let randomBlock = parseInt(Math.random() * parseInt(result.number));
+    web3.eth.getBlock(randomBlock).then(block => {
+      params.key = block.hash;
+      let cipher = crypto.createCipher(params.algorithm, params.key);
+      let ciphered = cipher.update(
+        message,
+        params.inputEncoding,
+        params.outputEncoding
+      );
+      ciphered += cipher.final(params.outputEncoding);
+      ciphered = '' + randomBlock + '*' + ciphered;
+      res.json({
+        success: true,
+        encoded: ciphered
+      });
+    });
+  });
+});
+
 app.post('/dec', (req, res) => {
   let { encoded } = req.body;
-  var decipher = crypto.createDecipher(params.algorithm, params.key);
-  var deciphered = decipher.update(
-    encoded,
-    params.outputEncoding,
-    params.inputEncoding
-  );
-  deciphered += decipher.final(params.inputEncoding);
-  res.json({
-    success: true,
-    message: deciphered
+  params.key = encoded.split('*')[0];
+  encoded = encoded.split('*')[1];
+  web3.eth.getBlock(params.key).then(block => {
+    var decipher = crypto.createDecipher(params.algorithm, block.hash);
+    var deciphered = decipher.update(
+      encoded,
+      params.outputEncoding,
+      params.inputEncoding
+    );
+    deciphered += decipher.final(params.inputEncoding);
+    res.json({
+      success: true,
+      message: deciphered
+    });
   });
 });
 
