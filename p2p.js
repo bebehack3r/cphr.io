@@ -4,25 +4,54 @@ const Mplex = require('libp2p-mplex');
 const SECIO = require('libp2p-secio');
 const PeerInfo = require('peer-info');
 const MulticastDNS = require('libp2p-mdns');
+const Railing = require('libp2p-railing');
+const Swarm = require('libp2p-swarm');
+const PeerBook = require('peer-book');
+const WStar = require('libp2p-webrtc-star');
+const multiaddr = require('multiaddr');
 const waterfall = require('async/waterfall');
 const parallel = require('async/parallel');
 const pull = require('pull-stream');
+const wrtc = require('wrtc');
 
-class MyBundle extends libp2p {
+const bootstrapers = [
+  '/ip4/104.236.176.52/tcp/4001/ipfs/QmSoLnSGccFuZQJzRadHn95W2CrSFmZuTdDWP8HXaHca9z',
+  '/ip4/104.131.131.82/tcp/4001/ipfs/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ',
+  '/ip4/104.236.179.241/tcp/4001/ipfs/QmSoLPppuBtQSGwKDZT2M73ULpjvfd3aZ6ha4oFGL1KrGM',
+  '/ip4/162.243.248.213/tcp/4001/ipfs/QmSoLueR4xBeUbY9WZ9xGUUxunbKWcrNFTDAadQJmocnWm',
+  '/ip4/128.199.219.111/tcp/4001/ipfs/QmSoLSafTMBsPKadTEgaXctDQVcqN88CNLHXMkTNwMKPnu',
+  '/ip4/104.236.76.40/tcp/4001/ipfs/QmSoLV4Bbm51jM9C4gDYZQ9Cy3U6aXMJDAbzgu2fzaDs64',
+  '/ip4/178.62.158.247/tcp/4001/ipfs/QmSoLer265NRgSp2LA3dPaeykiS1J6DifTC88f5uVQKNAd',
+  '/ip4/178.62.61.185/tcp/4001/ipfs/QmSoLMeWqB7YGVLJN3pNLQpmmEk35v6wYtsMGLzSr5QBU3',
+  '/ip4/104.236.151.122/tcp/4001/ipfs/QmSoLju6m7xTh3DuokvT3886QRYqxAzb1kShaanJgW36yx',
+  '/ip6/2604:a880:1:20::1f9:9001/tcp/4001/ipfs/QmSoLnSGccFuZQJzRadHn95W2CrSFmZuTdDWP8HXaHca9z',
+  '/ip6/2604:a880:1:20::203:d001/tcp/4001/ipfs/QmSoLPppuBtQSGwKDZT2M73ULpjvfd3aZ6ha4oFGL1KrGM',
+  '/ip6/2604:a880:0:1010::23:d001/tcp/4001/ipfs/QmSoLueR4xBeUbY9WZ9xGUUxunbKWcrNFTDAadQJmocnWm',
+  '/ip6/2400:6180:0:d0::151:6001/tcp/4001/ipfs/QmSoLSafTMBsPKadTEgaXctDQVcqN88CNLHXMkTNwMKPnu',
+  '/ip6/2604:a880:800:10::4a:5001/tcp/4001/ipfs/QmSoLV4Bbm51jM9C4gDYZQ9Cy3U6aXMJDAbzgu2fzaDs64',
+  '/ip6/2a03:b0c0:0:1010::23:1001/tcp/4001/ipfs/QmSoLer265NRgSp2LA3dPaeykiS1J6DifTC88f5uVQKNAd',
+  '/ip6/2a03:b0c0:1:d0::e7:1/tcp/4001/ipfs/QmSoLMeWqB7YGVLJN3pNLQpmmEk35v6wYtsMGLzSr5QBU3',
+  '/ip6/2604:a880:1:20::1d9:6001/tcp/4001/ipfs/QmSoLju6m7xTh3DuokvT3886QRYqxAzb1kShaanJgW36yx',
+  '/dns4/wss0.bootstrap.libp2p.io/tcp/443/wss/ipfs/QmZMxNdpMkewiVZLMRxaNxUeZpDUb34pWjZ1kZvsd16Zic',
+  '/dns4/wss1.bootstrap.libp2p.io/tcp/443/wss/ipfs/Qmbut9Ywz9YEDrz8ySBSgWyJk41Uvm2QJPhwDJzJyGFsD6'
+];
+
+class DefaultNode extends libp2p {
   constructor(peerInfo) {
     const modules = {
-      transport: [new TCP()],
+      transport: [new TCP(), new WStar({ wrtc: wrtc })],
       connection: {
         muxer: [Mplex],
         crypto: [SECIO]
       },
+      // discovery: [new Railing(bootstrapers)]
       discovery: [new MulticastDNS(peerInfo, { interval: 1000 })]
     };
     super(modules, peerInfo);
   }
 }
 
-function createNode(callback) {
+let createNode = callback => {
   let node;
 
   waterfall(
@@ -30,88 +59,41 @@ function createNode(callback) {
       cb => PeerInfo.create(cb),
       (peerInfo, cb) => {
         peerInfo.multiaddrs.add('/ip4/0.0.0.0/tcp/0');
-        node = new MyBundle(peerInfo);
+        node = new DefaultNode(peerInfo);
         node.start(cb);
       }
     ],
     err => callback(err, node)
   );
-}
+};
 
-parallel([cb => createNode(cb), cb => createNode(cb)], (err, nodes) => {
-  if (err) {
-    throw err;
-  }
-
-  const node1 = nodes[0];
-  const node2 = nodes[1];
-
-  let node1cipher = '';
-  let node2cipher = '';
-
-  const node1addr = node1.peerInfo.id.toB58String();
-  const node2addr = node2.peerInfo.id.toB58String();
-
-  node1.dial(node2.peerInfo, () => {});
-
-  node1.handle('/genesis', (protocol, conn) => {
-    pull(
-      conn,
-      pull.collect((err, cipher) => {
-        node1cipher = cipher.toString();
-        node1.dialProtocol(node2.peerInfo, '/established', (err, conn) => {
-          if (err) {
-            throw err;
-          }
-          pull(pull.values(['success']), conn);
-        });
-      })
-    );
-  });
-
-  node2.handle('/genesis', (protocol, conn) => {
-    pull(
-      conn,
-      pull.collect((err, cipher) => {
-        node2cipher = cipher.toString();
-        node2.dialProtocol(node1.peerInfo, '/established', (err, conn) => {
-          if (err) {
-            throw err;
-          }
-          pull(pull.values(['success']), conn);
-        });
-      })
-    );
-  });
-
-  node1.handle('/established', (protocol, conn) => {
-    pull(
-      conn,
-      pull.collect((err, answr) => {
-        console.log(answr.toString());
-        return answr.toString() == 'success' ? true : false;
-      })
-    );
-  });
-
-  node2.handle('/established', (protocol, conn) => {
-    pull(
-      conn,
-      pull.collect((err, answr) => {
-        console.log(answr.toString());
-        return answr.toString() == 'success' ? true : false;
-      })
-    );
-  });
-
-  node1.on('peer:connect', peer => {
-    node1cipher = 'ajlsdnfladqwldsd3923-fjsd';
-    node1.dialProtocol(node2.peerInfo, '/genesis', (err, conn) => {
-      if (err) {
-        throw err;
-      }
-      pull(pull.values(['ajlsdnfladqwldsd3923-fjsd']), conn);
+let genPassPhrase = (peerId, node, swtch) => {
+  PeerInfo.create(new PeerInfo(peerId), async (err, peer) => {
+    swtch.dial(peer, () => {
+      swtch.dial(peer, '/genesis', (err, conn) => {
+        if (err) {
+          throw err;
+        }
+        node.cipher = 'ojafqwf-313-13dj1dnpd';
+        pull(pull.values([node.cipher]), conn);
+      });
     });
   });
-  // node2.on('peer:connect', peer => {});
-});
+};
+
+let getPassPhrase = (peerId, node, swtch) => {
+  PeerInfo.create(new PeerInfo(peerId), async (err, peer) => {
+    swtch.dial(peer, () => {
+      swtch.dial(peer, '/exchange', (err, conn) => {
+        if (err) {
+          throw err;
+        }
+        console.log(node.cipher);
+      });
+    });
+  });
+};
+
+module.exports.createNode = createNode;
+module.exports.genPassPhrase = genPassPhrase;
+module.exports.getPassPhrase = getPassPhrase;
