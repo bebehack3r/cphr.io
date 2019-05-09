@@ -1,0 +1,35 @@
+# Snyk (https://snyk.io) policy file, patches or ignores known vulnerabilities.
+version: v1.13.3
+ignore: {}
+# patches apply the minimum changes required to fix a vulnerability
+patch:
+  'npm:debug:20170905':
+    - socket.io-p2p-server > debug:
+        patched: '2019-05-09T07:23:03.705Z'
+    - socket.io-p2p-server > mocha > debug:
+        patched: '2019-05-09T07:23:03.705Z'
+  'npm:hoek:20180212':
+    - wrtc > node-pre-gyp > hawk > hoek:
+        patched: '2019-05-09T07:23:03.705Z'
+    - wrtc > node-pre-gyp > hawk > boom > hoek:
+        patched: '2019-05-09T07:23:03.705Z'
+    - wrtc > node-pre-gyp > hawk > sntp > hoek:
+        patched: '2019-05-09T07:23:03.705Z'
+    - wrtc > node-pre-gyp > request > hawk > hoek:
+        patched: '2019-05-09T07:23:03.705Z'
+    - wrtc > node-pre-gyp > hawk > cryptiles > boom > hoek:
+        patched: '2019-05-09T07:23:03.705Z'
+    - wrtc > node-pre-gyp > request > hawk > boom > hoek:
+        patched: '2019-05-09T07:23:03.705Z'
+    - wrtc > node-pre-gyp > request > hawk > sntp > hoek:
+        patched: '2019-05-09T07:23:03.705Z'
+    - wrtc > node-pre-gyp > request > hawk > cryptiles > boom > hoek:
+        patched: '2019-05-09T07:23:03.705Z'
+  'npm:minimatch:20160620':
+    - socket.io-p2p-server > mocha > glob > minimatch:
+        patched: '2019-05-09T07:23:03.705Z'
+  'npm:ms:20151024':
+    - socket.io-p2p-server > debug > ms:
+        patched: '2019-05-09T07:23:03.705Z'
+    - socket.io-p2p-server > mocha > debug > ms:
+        patched: '2019-05-09T07:23:03.705Z'
